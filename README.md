@@ -21,10 +21,7 @@ GPU Price Checker is a command-line tool that fetches and displays GPU stock and
    ```sh
    git clone https://github.com/yourusername/gpu_pricecheck.git
    cd gpu_pricecheck
-   ```
-3. Install:
-   ```sh
-   cargo install --path .
+   cargo run
    ```
 
 ## Usage

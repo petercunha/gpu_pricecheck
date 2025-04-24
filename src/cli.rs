@@ -88,6 +88,6 @@ pub struct Args {
     pub format: OutputFormat,
 
     /// Find the single cheapest available listing for each GPU model
-    #[arg(long)]
+    #[arg(short = 'c', long)]
     pub cheapest_each: bool,
 }

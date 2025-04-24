@@ -30,7 +30,7 @@ GPU Price Checker is a command-line tool that fetches and displays GPU stock and
 Run the tool from the command line:
 
 ```sh
-gpu_pricecheck.exe [OPTIONS] [GPU]
+gpu_pricecheck.exe [GPU] [OPTIONS]
 ```
 
 ### Arguments

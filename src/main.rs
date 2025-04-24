@@ -9,7 +9,7 @@ mod scraper;
 
 // Use items from modules
 use cli::{Args, OutputFormat, SortColumn};
-use scraper::{GpuListing, BASE_URL};
+use scraper::BASE_URL;
 
 fn main() -> Result<()> {
     let args = Args::parse();

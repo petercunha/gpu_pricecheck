@@ -229,14 +229,14 @@ fn create_status_cell(status: &str) -> Cell {
 }
 
 // Helper function to create a clickable link for terminals supporting it
-fn create_clickable_link(url: &str, text: &str) -> String {
-    if url.is_empty() {
-        text.to_string()
-    } else {
-        // Use BEL (\x07) as the terminator instead of ESC \ (\x1B\\)
-        format!("\x1B]8;;{}\x07{}\x1B]8;;\x07", url, text)
-    }
-}
+// fn create_clickable_link(url: &str, text: &str) -> String {
+//     if url.is_empty() {
+//         text.to_string()
+//     } else {
+//         // Use BEL (\x07) as the terminator instead of ESC \ (\x1B\\)
+//         format!("\x1B]8;;{}\x07{}\x1B]8;;\x07", url, text)
+//     }
+// }
 
 fn print_table(listings: &[GpuListing], sort_by: &SortColumn, descending: bool) {
     if listings.is_empty() {
@@ -256,7 +256,7 @@ fn print_table(listings: &[GpuListing], sort_by: &SortColumn, descending: bool) 
         ColumnConstraint::LowerBoundary(Width::Fixed(15)), // Status
         ColumnConstraint::LowerBoundary(Width::Fixed(15)), // Price
         ColumnConstraint::LowerBoundary(Width::Fixed(35)), // Last Available
-        ColumnConstraint::LowerBoundary(Width::Fixed(15)), // Link - Give it a minimum width
+        ColumnConstraint::LowerBoundary(Width::Fixed(25)), // Link - Increase minimum width
     ]);
 
     table.set_header(vec![
@@ -273,7 +273,7 @@ fn print_table(listings: &[GpuListing], sort_by: &SortColumn, descending: bool) 
             create_status_cell(&item.status),
             Cell::new(&item.price).set_alignment(CellAlignment::Right),
             Cell::new(&item.last_available).set_alignment(CellAlignment::Right),
-            Cell::new(create_clickable_link(&item.link, "Purchase Link")), // Use updated link function
+            Cell::new(&item.link), // Display the raw URL directly
         ]);
     }
 

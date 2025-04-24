@@ -19,7 +19,7 @@ GPU Price Checker is a command-line tool that fetches and displays GPU stock and
 1. Ensure you have [Rust](https://www.rust-lang.org/) installed on your system.
 2. Clone this repository:
    ```sh
-   git clone https://github.com/yourusername/gpu_pricecheck.git
+   git clone https://github.com/petercunha/gpu_pricecheck.git
    cd gpu_pricecheck
    cargo run
    ```

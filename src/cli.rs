@@ -63,7 +63,7 @@ pub enum OutputFormat {
 #[derive(Parser, Debug)]
 #[command(author, version, about = "Checks GPU stock and prices from nowinstock.net", long_about = None)]
 pub struct Args {
-    /// GPU Model to check stock for
+    /// GPU Model to check stock for (ignored if --cheapest-each is used)
     #[arg(value_enum, default_value = "5080")]
     pub gpu: GpuModel,
 
@@ -86,4 +86,8 @@ pub struct Args {
     /// Output format
     #[arg(short, long, value_enum, default_value = "table")]
     pub format: OutputFormat,
+
+    /// Find the single cheapest available listing for each GPU model
+    #[arg(long)]
+    pub cheapest_each: bool,
 }

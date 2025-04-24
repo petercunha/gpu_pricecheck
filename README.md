@@ -1,15 +1,18 @@
 # GPU Price Checker
 
-GPU Price Checker is a command-line tool that fetches and displays GPU stock and pricing information from [NowInStock.net](https://www.nowinstock.net). It allows users to filter, sort, and limit the results for easier analysis.
+GPU Price Checker is a command-line tool that fetches and displays GPU stock and pricing information from [NowInStock.net](https://www.nowinstock.net). It allows users to filter, sort, limit the results, find the cheapest listing per model, and output in various formats.
 
 ## Features
 
 - Fetches GPU stock and pricing data from NowInStock.net.
-- Supports filtering out unavailable listings (e.g., "Out of Stock", "Not Tracking").
+- Supports multiple GPU models (`5090`, `5080`, `5070ti`, `5070`).
+- Filters out unavailable listings (e.g., "Out of Stock", "Not Tracking") by default.
+- Finds the single cheapest available listing for each supported GPU model (`--cheapest-each`).
 - Allows sorting by various columns: Name, Status, Price, Last Available, and Link.
 - Supports ascending or descending sort order.
 - Limits the number of results displayed.
-- Displays results in a clean, tabular format.
+- Outputs results in Table (default), JSON, YAML, or TOML formats.
+- Suppresses informational messages when outputting in non-Table formats.
 
 ## Installation
 
@@ -30,17 +33,21 @@ GPU Price Checker is a command-line tool that fetches and displays GPU stock and
 Run the tool from the command line:
 
 ```sh
-gpu_pricecheck.exe [GPU] [OPTIONS]
+# Using cargo run during development
+cargo run -- [OPTIONS] [GPU]
+
+# Using the compiled binary (e.g., after `cargo build --release`)
+./target/release/gpu_pricecheck [OPTIONS] [GPU]
 ```
 
 ### Arguments
 
-- `[GPU]`: GPU model to check stock for. Default is `5080`.  
+- `[GPU]`: GPU model to check stock for. Default is `5080`. Ignored if `--cheapest-each` is used.
   Possible values: `5090`, `5080`, `5070ti`, `5070`.
 
 ### Options
 
-- `-s, --sort-by <SORT_BY>`: Column to sort by. Default is `price`.  
+- `-s, --sort-by <SORT_BY>`: Column to sort by. Default is `price`.
   Possible values: `name`, `status`, `price`, `last`, `link`.
 
 - `-d, --desc`: Sort in descending order. Default is ascending.
@@ -49,26 +56,45 @@ gpu_pricecheck.exe [GPU] [OPTIONS]
 
 - `-n, --limit <LIMIT>`: Limit the number of results shown.
 
+- `-f, --format <FORMAT>`: Output format. Default is `table`.
+  Possible values: `table`, `json`, `yaml`, `toml`.
+
+- `--cheapest-each`: Find and display the single cheapest available listing for each GPU model (5090, 5080, etc.). Ignores the `[GPU]` argument.
+
 - `-h, --help`: Display help information.
 
 - `-V, --version`: Display version information.
 
 ### Examples
 
-1. Check stock for the RTX 5090 and sort by price in descending order:
-   ```sh
-   gpu_pricecheck.exe 5090 -s price -d
-   ```
+1.  Check stock for the RTX 5090 and sort by price in descending order:
 
-2. Show all listings for the RTX 5080, including unavailable ones:
-   ```sh
-   gpu_pricecheck.exe 5080 --all
-   ```
+    ```sh
+    cargo run -- 5090 -s price -d
+    ```
 
-3. Limit results to the top 5 cheapest listings:
-   ```sh
-   gpu_pricecheck.exe 5070 -n 5
-   ```
+2.  Show all listings for the RTX 5080, including unavailable ones, in JSON format:
+
+    ```sh
+    cargo run -- 5080 --all --format json
+    ```
+
+3.  Limit results to the top 5 cheapest listings for the 5070 Ti:
+
+    ```sh
+    cargo run -- 5070ti -n 5
+    ```
+
+4.  Find the cheapest available listing for each GPU model and output as YAML:
+
+    ```sh
+    cargo run -- --cheapest-each --format yaml
+    ```
+
+5.  Find the cheapest available listing for each model, sort them by name, and show only the top 2:
+    ```sh
+    cargo run -- --cheapest-each --sort-by name -n 2
+    ```
 
 ## Development
 

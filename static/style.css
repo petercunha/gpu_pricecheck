@@ -1,0 +1,157 @@
+body {
+    font-family: sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+header {
+    background-color: #333;
+    color: #fff;
+    padding: 1rem 0;
+    text-align: center;
+}
+
+header h1 {
+    margin: 0;
+    padding-bottom: 0.5rem;
+}
+
+nav {
+    margin-top: 0.5rem;
+}
+
+nav a {
+    color: #fff;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    margin: 0 0.2rem;
+    border-radius: 4px;
+    transition: background-color 0.3s ease;
+}
+
+nav a:hover,
+nav a.active {
+    background-color: #555;
+}
+
+
+main {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 1rem;
+    background-color: #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+}
+
+h2 {
+    color: #333;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.last-updated {
+    font-size: 0.9em;
+    color: #666;
+    text-align: right;
+    margin-bottom: 1rem;
+}
+
+.filters {
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    background-color: #eee;
+    border-radius: 4px;
+}
+
+.filters label {
+    margin-right: 1rem;
+    cursor: pointer;
+}
+
+/* DataTables overrides and custom styles */
+#gpuTable {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#gpuTable th,
+#gpuTable td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+#gpuTable th {
+    background-color: #f2f2f2;
+    cursor: pointer;
+}
+
+#gpuTable tbody tr:hover {
+    background-color: #f5f5f5;
+}
+
+#gpuTable td a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+#gpuTable td a:hover {
+    text-decoration: underline;
+}
+
+/* Status cell styling */
+.status-cell {
+    font-weight: bold;
+    text-align: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.9em;
+    white-space: nowrap;
+}
+
+.status-in-stock {
+    background-color: #28a745;
+}
+
+.status-preorder {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.status-notify-me {
+    background-color: #17a2b8;
+}
+
+.status-out-of-stock {
+    background-color: #dc3545;
+}
+
+.status-not-tracking {
+    background-color: #6c757d;
+}
+
+.status-ebay {
+    background-color: #8a2be2;
+}
+
+/* Style for Ebay */
+
+/* DataTables search/length styling */
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter {
+    margin-bottom: 1em;
+}
+
+footer {
+    text-align: center;
+    margin-top: 2rem;
+    padding: 1rem;
+    font-size: 0.9em;
+    color: #666;
+}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>GPU Stock Check</title>
+        <style>
+            body { font-family: sans-serif; line-height: 1.5; padding: 1em; }
+            table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            tr:nth-child(even) { background-color: #f9f9f9; }
+            .status-in-stock { color: green; font-weight: bold; }
+            .status-preorder { color: orange; font-weight: bold; }
+            .status-out-of-stock { color: red; }
+            .error { color: red; border: 1px solid red; padding: 1em; margin-bottom: 1em; }
+            .footer { margin-top: 1em; font-size: 0.9em; color: #555; }
+        </style>
+    </head>
+    <body>
+        <h1>GPU Stock Status</h1>
+        <p class="footer">Data from NowInStock.net | Last Updated: {{ last_updated }}</p>
+
+        {% if error.is_some() %}
+        <div class="error">
+            <strong>Error during last update:</strong> {{ error.unwrap() }}
+        </div>
+        {% endif %}
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Status</th>
+                    <th>Price</th>
+                    <th>Last Available</th>
+                    <th>Link</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in listings %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td class="status-{{ item.status.to_lowercase().replace(' ', '-') }}">
+                        {{ item.status }}
+                    </td>
+                    <td style="text-align: right;">{{ item.price }}</td>
+                    <td style="text-align: right;">{{ item.last_available }}</td>
+                    <td><a href="{{ item.link }}" target="_blank" rel="noopener noreferrer">Link</a></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center;">No listings found or data is currently unavailable.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+    </body>
+    </html>

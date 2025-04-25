@@ -1,11 +1,11 @@
-use anyhow::{Context, Result};
+use anyhow::Result; // Removed unused Context import
 use regex::Regex;
 use scraper::{Html, Selector};
 use lazy_static::lazy_static;
 use serde::Serialize; // Import Serialize
 
 pub const BASE_URL: &str = "https://www.nowinstock.net/computers/videocards/nvidia/";
-const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
+pub const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"; // Made public
 
 lazy_static! {
     static ref PRICE_RE: Regex = Regex::new(r"[\d,]+\.\d{2}").unwrap();
@@ -22,35 +22,22 @@ pub struct GpuListing {
     pub link: String,
 }
 
+impl GpuListing {
+    pub fn status_class(&self) -> String {
+        self.status
+            .to_lowercase()
+            .replace(' ', "-")
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .collect()
+    }
+}
+
 // Helper function to parse price string into a numeric value for sorting
 fn parse_price(price_str: &str) -> Option<f64> {
     PRICE_RE.find(price_str).and_then(|mat| {
         mat.as_str().replace(',', "").parse::<f64>().ok()
     })
-}
-
-pub fn fetch_html(url: &str, quiet: bool) -> Result<String> {
-    let client = reqwest::blocking::Client::builder()
-        .user_agent(USER_AGENT)
-        .build()
-        .context("Failed to build reqwest client")?;
-
-    if !quiet {
-        println!("Downloading HTML from {}...", url);
-    }
-    let response = client.get(url)
-        .send()
-        .context(format!("Failed to fetch URL: {}", url))?;
-
-    if !response.status().is_success() {
-        anyhow::bail!("Request failed with status: {}", response.status());
-    }
-
-    let html_content = response.text().context("Failed to read response text")?;
-    if !quiet {
-        println!("Download complete.");
-    }
-    Ok(html_content)
 }
 
 pub fn parse_listings(html_content: &str, quiet: bool) -> Result<Vec<GpuListing>> {

@@ -1,19 +1,34 @@
-use anyhow::{Context, Result}; // Add Context
-use clap::{Parser, ValueEnum}; // Add ValueEnum
+use anyhow::{Context, Result};
+use clap::{Parser, ValueEnum}; // Import ValueEnum trait
 use std::cmp::Ordering;
 
 // Declare modules
 mod cli;
 mod output;
 mod scraper;
+mod web; // Add web module
 
 // Use items from modules
-use cli::{Args, GpuModel, OutputFormat, SortColumn}; // Add GpuModel
-use scraper::{GpuListing, BASE_URL}; // Add GpuListing
+use cli::{Args, GpuModel, OutputFormat, SortColumn};
+use scraper::GpuListing; // Keep GpuListing import
 
-fn main() -> Result<()> {
+#[tokio::main] // Make main async using tokio runtime
+async fn main() -> Result<()> { // Make main async
     let args = Args::parse();
 
+    if args.web {
+        // --- Mode: Web Server ---
+        web::run_server(args.listen).await?; // Run the async web server
+    } else {
+        // --- Mode: CLI ---
+        run_cli(args).await?; // Run the original logic (now async)
+    }
+
+    Ok(())
+}
+
+// Extracted original logic into an async function
+async fn run_cli(args: Args) -> Result<()> {
     // Determine if logging should be suppressed
     let quiet = args.format != OutputFormat::Table;
     let mut final_listings: Vec<GpuListing> = Vec::new();
@@ -25,14 +40,16 @@ fn main() -> Result<()> {
         }
 
         for model in GpuModel::value_variants() {
-            let model_url = format!("{}{}", BASE_URL, model);
+            let model_url = format!("{}{}", scraper::BASE_URL, model);
             if !quiet {
                 println!("--- Checking: {:?} ---", model);
             }
 
             // Use a closure to handle errors gracefully for each model
-            let cheapest_result = (|| -> Result<Option<GpuListing>> {
-                let html = scraper::fetch_html(&model_url, quiet)
+            let cheapest_result = (|| async { // Make closure async
+                // Use the async fetch_html from the web module for consistency
+                let html = web::fetch_html(&model_url, quiet)
+                    .await // Use await
                     .with_context(|| format!("Failed to fetch HTML for {:?}", model))?;
                 let mut listings = scraper::parse_listings(&html, quiet)
                     .with_context(|| format!("Failed to parse listings for {:?}", model))?;
@@ -54,8 +71,8 @@ fn main() -> Result<()> {
                          .unwrap_or(Ordering::Equal) // Handle potential NaN comparison if necessary
                     });
 
-                Ok(cheapest)
-            })(); // Immediately call the closure
+                Ok::<_, anyhow::Error>(cheapest) // Explicit type for Result
+            })().await; // Immediately call and await the async closure
 
             match cheapest_result {
                 Ok(Some(listing)) => {
@@ -67,13 +84,13 @@ fn main() -> Result<()> {
                     }
                 }
                 Err(e) => {
-                    // Print error only if not quiet, but always log it potentially?
                     if !quiet {
                          eprintln!("Warning: Failed to process model {:?}: {:?}", model, e);
                     }
-                    // Continue to the next model even if one fails
                 }
             }
+             // Optional: Add a small delay between requests in CLI mode too
+             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
          if !quiet {
              println!("--- Finished checking all models ---");
@@ -81,8 +98,9 @@ fn main() -> Result<()> {
 
     } else {
         // --- Mode: Original logic for a single GPU model ---
-        let url = format!("{}{}", BASE_URL, args.gpu);
-        let html = scraper::fetch_html(&url, quiet)?;
+        let url = format!("{}{}", scraper::BASE_URL, args.gpu);
+        // Use the async fetch_html from the web module
+        let html = web::fetch_html(&url, quiet).await?;
         let mut listings = scraper::parse_listings(&html, quiet)?;
 
         // --- Filtering ---
@@ -151,6 +169,5 @@ fn main() -> Result<()> {
         OutputFormat::Yaml => output::print_yaml(&final_listings)?,
         OutputFormat::Toml => output::print_toml(&final_listings)?,
     }
-
     Ok(())
 }

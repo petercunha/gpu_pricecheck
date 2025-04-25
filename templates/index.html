@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>GPU Stock Check - {{ title }}</title>
+		<!-- DataTables CSS -->
+		<link
+			rel="stylesheet"
+			type="text/css"
+			href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"
+		/>
+		<!-- Custom CSS -->
+		<link rel="stylesheet" href="/static/style.css" />
+	</head>
+	<body>
+		<header>
+			<h1>GPU Stock Check</h1>
+			<nav>
+				<a href="/" class="{% if current_model.is_none() %}active{% endif %}"
+					>All Models</a
+				>
+				{% for m in models %}
+				<a
+					href="/gpu/{{ m.to_string().trim_end_matches('/') }}"
+					class="{% if let Some(current) = current_model %}{% if current == m %}active{% endif %}{% endif %}"
+				>
+					{{ m.to_string().trim_end_matches('/')|upper }}
+				</a>
+				{% endfor %}
+			</nav>
+		</header>
+
+		<main>
+			<h2>{{ title }}</h2>
+			<p class="last-updated">Last Updated: {{ last_updated }}</p>
+
+			<div class="filters">
+				<label
+					><input
+						type="checkbox"
+						class="status-filter"
+						value="in-stock"
+						checked
+					/>
+					In Stock</label
+				>
+				<label
+					><input
+						type="checkbox"
+						class="status-filter"
+						value="preorder"
+						checked
+					/>
+					Preorder</label
+				>
+				<label
+					><input
+						type="checkbox"
+						class="status-filter"
+						value="notify-me"
+						checked
+					/>
+					Notify Me</label
+				>
+				<label
+					><input type="checkbox" class="status-filter" value="out-of-stock" />
+					Out of Stock</label
+				>
+				<label
+					><input type="checkbox" class="status-filter" value="not-tracking" />
+					Not Tracking</label
+				>
+				<label
+					><input type="checkbox" class="status-filter" value="ebay" />
+					Ebay</label
+				>
+			</div>
+
+			<table id="gpuTable" class="display compact stripe hover">
+				<thead>
+					<tr>
+						<th>Name</th>
+						<th>Status</th>
+						<th>Price</th>
+						<th>Last Available</th>
+						<th>Link</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for listing in listings %}
+					<tr data-status="{{ listing.status_class() }}">
+						<td>{{ listing.name }}</td>
+						<td class="status-cell status-{{ listing.status_class() }}">
+							{{ listing.status }}
+						</td>
+						<td data-sort="{{ listing.price_numeric.unwrap_or(-1.0) }}">
+							{{ listing.price }}
+						</td>
+						<td>{{ listing.last_available }}</td>
+						<td>
+							<a
+								href="{{ listing.link }}"
+								target="_blank"
+								rel="noopener noreferrer"
+								>Link</a
+							>
+						</td>
+					</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</main>
+
+		<footer>
+			<p>Data scraped from nowinstock.net</p>
+		</footer>
+
+		<!-- jQuery -->
+		<script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+		<!-- DataTables JS -->
+		<script
+			type="text/javascript"
+			src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"
+		></script>
+		<!-- Custom JS -->
+		<script src="/static/script.js"></script>
+	</body>
+</html>

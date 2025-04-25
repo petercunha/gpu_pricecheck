@@ -13,6 +13,7 @@ use clap::ValueEnum;
 use futures::future::join_all;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::services::ServeDir;
+use anyhow::anyhow;
 
 #[derive(Template)]
 #[template(path = "index.html")]
@@ -53,15 +54,21 @@ async fn home_handler(State(_state): State<Arc<AppState>>) -> impl IntoResponse 
     let models_to_check = GpuModel::value_variants();
     let fetch_futures = models_to_check.iter().map(|model| async move {
         let model_url = format!("{}{}", scraper::BASE_URL, model);
+        // Errors fetching/parsing a single model result in an empty list for that model,
+        // allowing the page to still load with data from other models.
         match fetch_and_parse(&model_url).await {
             Ok(listings) => Ok::<(GpuModel, Vec<GpuListing>), anyhow::Error>((*model, listings)),
-            Err(_) => Ok::<(GpuModel, Vec<GpuListing>), anyhow::Error>((*model, Vec::new())),
+            Err(e) => {
+                // Log the error server-side but don't fail the whole request
+                eprintln!("Failed to fetch/parse listings for {:?}: {}", model, e);
+                Ok::<(GpuModel, Vec<GpuListing>), anyhow::Error>((*model, Vec::new()))
+            },
         }
     });
     let results: Vec<Result<(GpuModel, Vec<GpuListing>), _>> = join_all(fetch_futures).await;
     let all_listings: Vec<GpuListing> = results
         .into_iter()
-        .filter_map(|res: Result<(GpuModel, Vec<GpuListing>), _>| res.ok())
+        .filter_map(|res| res.ok()) // Filter out errors here
         .flat_map(|(_, listings)| listings)
         .collect();
     let template = IndexTemplate {
@@ -71,28 +78,39 @@ async fn home_handler(State(_state): State<Arc<AppState>>) -> impl IntoResponse 
         current_model: None,
         last_updated: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     };
-    Html(template.render().unwrap_or_else(|_| "Template error".to_string()))
+    // Render template or return error string
+    match template.render() {
+        Ok(html) => Html(html).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Template rendering failed: {}", e),
+        )
+            .into_response(),
+    }
 }
 
 // Handler for individual GPU model pages
 async fn gpu_model_handler(
     State(_state): State<Arc<AppState>>,
     Path(model_str): Path<String>,
-) -> impl IntoResponse {
-    let model: GpuModel = match model_str.parse() {
-        Ok(m) => m,
-        Err(_) => return Html("Invalid GPU model".to_string()),
-    };
+) -> Result<Html<String>, AppError> { // Return Result using AppError
+    let model: GpuModel = model_str.parse()
+        // Use map_err to convert the parsing error into AppError
+        .map_err(|_| AppError(anyhow!("Invalid GPU model specified: {}", model_str)))?;
     let model_url = format!("{}{}", scraper::BASE_URL, model);
-    let listings = fetch_and_parse(&model_url).await.unwrap_or_default();
+    // Use `?` to propagate errors from fetch_and_parse, automatically converting them to AppError
+    let listings = fetch_and_parse(&model_url).await?;
     let template = IndexTemplate {
-        title: format!("{:?} Listings", model),
+        title: format!("{:?} Listings", model), // Use Debug format for enum
         listings,
         models: GpuModel::value_variants().to_vec(),
         current_model: Some(model),
         last_updated: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
     };
-    Html(template.render().unwrap_or_else(|_| "Template error".to_string()))
+    // Render the template, converting template errors into AppError using `?`
+    let html_output = template.render()
+        .map_err(|e| AppError(anyhow!(e).context("Template rendering failed")))?;
+    Ok(Html(html_output)) // Return Ok(Html(...)) on success
 }
 
 async fn fetch_and_parse(url: &str) -> Result<Vec<GpuListing>> {

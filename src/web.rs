@@ -1,4 +1,4 @@
-use crate::cli::{GpuModel, ParseGpuModelError};
+use crate::cli::GpuModel;
 use crate::scraper::{self, GpuListing};
 use anyhow::{Context, Result};
 use askama::Template;

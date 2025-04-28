@@ -1,5 +1,5 @@
 use crate::cli::GpuModel;
-use crate::scraper::{self, GpuListing};
+use crate::scraper::{self, GpuListing, USER_AGENT};
 use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
@@ -11,7 +11,7 @@ use axum::{
 };
 use clap::ValueEnum;
 use futures::future::join_all;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc};
 use tower_http::services::ServeDir;
 use anyhow::anyhow;
 
@@ -125,8 +125,8 @@ pub async fn fetch_html(url: &str, quiet: bool) -> Result<String> {
     let client = reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .http1_only()
-        .user_agent(scraper::USER_AGENT)
-        .timeout(Duration::from_secs(15))
+        .user_agent(USER_AGENT)
+        .timeout(std::time::Duration::from_secs(15))
         .build()?;
 
     let response = client.get(url).send().await.context("Failed to send request")?;
@@ -143,14 +143,29 @@ pub async fn fetch_html(url: &str, quiet: bool) -> Result<String> {
 }
 
 pub async fn run_server(listen_addr: SocketAddr) -> Result<()> {
+    use chrono::Local;
+    use axum::extract::ConnectInfo;
+    use std::net::SocketAddr as StdSocketAddr;
+    println!("Listening on http://{}", listen_addr);
     let state = Arc::new(AppState {});
     let app = Router::new()
         .route("/", get(home_handler))
         .route("/gpu/:model", get(gpu_model_handler))
         .nest_service("/static", get_service(ServeDir::new("static")))
-        .with_state(state);
+        .with_state(state)
+        .layer(axum::middleware::from_fn(|req: axum::http::Request<axum::body::Body>, next: axum::middleware::Next| {
+            // Logging middleware: log timestamp, IP, method, path
+            let method = req.method().clone();
+            let path = req.uri().path().to_string();
+            let remote_addr = req.extensions().get::<ConnectInfo<StdSocketAddr>>()
+                .map(|info| info.0.to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+            let now = Local::now();
+            println!("[{}] {} {} {}", now.format("%Y-%m-%d %H:%M:%S"), remote_addr, method, path);
+            next.run(req)
+        }));
     let listener = tokio::net::TcpListener::bind(listen_addr).await?;
-    axum::serve(listener, app.into_make_service())
+    axum::serve(listener, app.into_make_service_with_connect_info::<StdSocketAddr>())
         .await
         .context("Web server failed")?;
     Ok(())

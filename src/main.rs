@@ -28,11 +28,12 @@ async fn main() -> Result<()> {
 }
 
 async fn run_cli(args: Args) -> Result<()> {
-    let quiet = args.format != OutputFormat::Table;
+    // Use the verbose flag to control logging
+    let logging = args.verbose;
     let mut final_listings: Vec<GpuListing> = Vec::new();
 
     if args.cheapest_each {
-        if !quiet {
+        if logging {
             println!("Finding the cheapest available listing for each GPU model...");
         }
         let models = GpuModel::value_variants();
@@ -42,10 +43,10 @@ async fn run_cli(args: Args) -> Result<()> {
             async move {
                 let model_url = format!("{}{}", scraper::BASE_URL, model);
                 let res = (|| async {
-                    let html = web::fetch_html(&model_url, quiet)
+                    let html = web::fetch_html(&model_url, !logging)
                         .await
                         .with_context(|| format!("Failed to fetch HTML for {:?}", model))?;
-                    let mut listings = scraper::parse_listings(&html, quiet)
+                    let mut listings = scraper::parse_listings(&html, !logging)
                         .with_context(|| format!("Failed to parse listings for {:?}", model))?;
                     if !args.all {
                         listings.retain(|item| {
@@ -53,6 +54,10 @@ async fn run_cli(args: Args) -> Result<()> {
                             lower_status != "out of stock" && lower_status != "not tracking"
                         });
                     }
+                    // Remove "Preorder" listings so that only in-stock items are considered for cheapest_each
+                    listings = listings.into_iter()
+                        .filter(|listing| listing.status.to_lowercase() != "preorder")
+                        .collect();
                     let cheapest = listings.into_iter()
                         .filter(|item| item.price_numeric.is_some())
                         .min_by(|a, b| {
@@ -69,22 +74,19 @@ async fn run_cli(args: Args) -> Result<()> {
         for (model, res) in results {
             match res {
                 Ok(Some(listing)) => final_listings.push(listing),
-                Ok(None) => {
-                    if !quiet {
-                        println!("No available listing with a valid price found for {:?}", model);
-                    }
+                Ok(None) if logging => {
+                    println!("No available listing with a valid price found for {:?}", model);
                 },
-                Err(e) => {
-                    if !quiet {
-                        eprintln!("Warning: Failed to process model {:?}: {:?}", model, e);
-                    }
-                }
+                Err(e) if logging => {
+                    eprintln!("Warning: Failed to process model {:?}: {:?}", model, e);
+                },
+                _ => {}
             }
         }
     } else {
         let url = format!("{}{}", scraper::BASE_URL, args.gpu);
-        let html = web::fetch_html(&url, quiet).await?;
-        let mut listings = scraper::parse_listings(&html, quiet)?;
+        let html = web::fetch_html(&url, !logging).await?;
+        let mut listings = scraper::parse_listings(&html, !logging)?;
         if !args.all {
             let original_count = listings.len();
             listings.retain(|item| {
@@ -92,50 +94,46 @@ async fn run_cli(args: Args) -> Result<()> {
                 lower_status != "out of stock" && lower_status != "not tracking"
             });
             let filtered_count = listings.len();
-            if !quiet && original_count > filtered_count {
+            if logging && original_count > filtered_count {
                 println!(
                     "Filtered out {} unavailable listings (Out of Stock, Not Tracking). Use --all to show.",
                     original_count - filtered_count
                 );
             }
-        } else if !quiet {
+        } else if logging {
             println!("Showing all listings (--all flag detected).");
         }
         final_listings = listings;
     }
 
-    if !final_listings.is_empty() {
-        if !quiet {
-            println!(
-                "Sorting results by {:?} {}...",
-                args.sort_by,
-                if args.desc { "descending" } else { "ascending" }
-            );
-        }
-        final_listings.sort_by(|a, b| {
-            let ordering = match args.sort_by {
-                SortColumn::Name => a.name.cmp(&b.name),
-                SortColumn::Status => a.status.cmp(&b.status),
-                SortColumn::Price => match (a.price_numeric, b.price_numeric) {
-                    (Some(pa), Some(pb)) => pa.partial_cmp(&pb).unwrap_or(std::cmp::Ordering::Equal),
-                    (Some(_), None) => std::cmp::Ordering::Less,
-                    (None, Some(_)) => std::cmp::Ordering::Greater,
-                    (None, None) => a.price.cmp(&b.price),
-                },
-                SortColumn::LastAvailable => a.last_available.cmp(&b.last_available),
-                SortColumn::Link => a.link.cmp(&b.link),
-            };
-            if args.desc { ordering.reverse() } else { ordering }
-        });
+    if !final_listings.is_empty() && logging {
+        println!(
+            "Sorting results by {:?} {}...",
+            args.sort_by,
+            if args.desc { "descending" } else { "ascending" }
+        );
     }
+    final_listings.sort_by(|a, b| {
+        let ordering = match args.sort_by {
+            SortColumn::Name => a.name.cmp(&b.name),
+            SortColumn::Status => a.status.cmp(&b.status),
+            SortColumn::Price => match (a.price_numeric, b.price_numeric) {
+                (Some(pa), Some(pb)) => pa.partial_cmp(&pb).unwrap_or(std::cmp::Ordering::Equal),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => a.price.cmp(&b.price),
+            },
+            SortColumn::LastAvailable => a.last_available.cmp(&b.last_available),
+            SortColumn::Link => a.link.cmp(&b.link),
+        };
+        if args.desc { ordering.reverse() } else { ordering }
+    });
 
     if let Some(limit) = args.limit {
-        if limit < final_listings.len() {
-            if !quiet {
-                println!("Limiting results to the top {} listings.", limit);
-            }
-            final_listings.truncate(limit);
+        if limit < final_listings.len() && logging {
+            println!("Limiting results to the top {} listings.", limit);
         }
+        final_listings.truncate(limit);
     }
 
     match args.format {

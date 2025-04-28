@@ -131,4 +131,8 @@ pub struct Args {
     /// Port and optional address for the web server (e.g., 8080 or 0.0.0.0:8080)
     #[arg(long, value_parser = parse_socket_addr, default_value = "127.0.0.1:8080")]
     pub listen: SocketAddr,
+
+    /// Enable verbose logging output (default is minimal logging)
+    #[arg(short, long)]
+    pub verbose: bool,
 }

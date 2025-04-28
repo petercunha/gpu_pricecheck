@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
 use clap::{Parser, ValueEnum}; // Import ValueEnum trait
-use std::cmp::Ordering;
 
 // Declare modules
 mod cli;
@@ -12,98 +11,80 @@ mod web; // Add web module
 use cli::{Args, GpuModel, OutputFormat, SortColumn};
 use scraper::GpuListing; // Keep GpuListing import
 
-#[tokio::main] // Make main async using tokio runtime
-async fn main() -> Result<()> { // Make main async
-    let args = Args::parse();
-
-    if args.web {
-        // --- Mode: Web Server ---
-        web::run_server(args.listen).await?; // Run the async web server
-    } else {
-        // --- Mode: CLI ---
-        run_cli(args).await?; // Run the original logic (now async)
+#[tokio::main]
+async fn main() -> Result<()> {
+    // Make Args mutable so we can override defaults when no extra parameters are given.
+    let mut args = Args::parse();
+    // If only the program name is provided, set cheapest_each to true.
+    if std::env::args().len() == 1 {
+        args.cheapest_each = true;
     }
-
+    if args.web {
+        web::run_server(args.listen).await?;
+    } else {
+        run_cli(args).await?;
+    }
     Ok(())
 }
 
-// Extracted original logic into an async function
 async fn run_cli(args: Args) -> Result<()> {
-    // Determine if logging should be suppressed
     let quiet = args.format != OutputFormat::Table;
     let mut final_listings: Vec<GpuListing> = Vec::new();
 
     if args.cheapest_each {
-        // --- Mode: Find cheapest for each model ---
         if !quiet {
             println!("Finding the cheapest available listing for each GPU model...");
         }
-
-        for model in GpuModel::value_variants() {
-            let model_url = format!("{}{}", scraper::BASE_URL, model);
-            if !quiet {
-                println!("--- Checking: {:?} ---", model);
+        let models = GpuModel::value_variants();
+        // Prepare a future for each model in parallel.
+        let cheapest_futures = models.iter().map(|model| {
+            let model = *model;
+            async move {
+                let model_url = format!("{}{}", scraper::BASE_URL, model);
+                let res = (|| async {
+                    let html = web::fetch_html(&model_url, quiet)
+                        .await
+                        .with_context(|| format!("Failed to fetch HTML for {:?}", model))?;
+                    let mut listings = scraper::parse_listings(&html, quiet)
+                        .with_context(|| format!("Failed to parse listings for {:?}", model))?;
+                    if !args.all {
+                        listings.retain(|item| {
+                            let lower_status = item.status.to_lowercase();
+                            lower_status != "out of stock" && lower_status != "not tracking"
+                        });
+                    }
+                    let cheapest = listings.into_iter()
+                        .filter(|item| item.price_numeric.is_some())
+                        .min_by(|a, b| {
+                            a.price_numeric.unwrap()
+                                .partial_cmp(&b.price_numeric.unwrap())
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        });
+                    Ok::<Option<GpuListing>, anyhow::Error>(cheapest)
+                })().await;
+                (model, res)
             }
-
-            // Use a closure to handle errors gracefully for each model
-            let cheapest_result = (|| async { // Make closure async
-                // Use the async fetch_html from the web module for consistency
-                let html = web::fetch_html(&model_url, quiet)
-                    .await // Use await
-                    .with_context(|| format!("Failed to fetch HTML for {:?}", model))?;
-                let mut listings = scraper::parse_listings(&html, quiet)
-                    .with_context(|| format!("Failed to parse listings for {:?}", model))?;
-
-                // Filter out unavailable listings (standard filtering)
-                if !args.all {
-                     listings.retain(|item| {
-                        let lower_status = item.status.to_lowercase();
-                        lower_status != "out of stock" && lower_status != "not tracking"
-                    });
-                }
-
-                // Find the cheapest listing *with* a numeric price
-                let cheapest = listings.into_iter()
-                    .filter(|item| item.price_numeric.is_some()) // Only consider items with a price
-                    .min_by(|a, b| {
-                        // Unwraps are safe due to the filter above
-                        a.price_numeric.unwrap().partial_cmp(&b.price_numeric.unwrap())
-                         .unwrap_or(Ordering::Equal) // Handle potential NaN comparison if necessary
-                    });
-
-                Ok::<_, anyhow::Error>(cheapest) // Explicit type for Result
-            })().await; // Immediately call and await the async closure
-
-            match cheapest_result {
-                Ok(Some(listing)) => {
-                    final_listings.push(listing);
-                }
+        });
+        let results = futures::future::join_all(cheapest_futures).await;
+        for (model, res) in results {
+            match res {
+                Ok(Some(listing)) => final_listings.push(listing),
                 Ok(None) => {
                     if !quiet {
-                        println!("No available listing with a valid price found for {:?}.", model);
+                        println!("No available listing with a valid price found for {:?}", model);
                     }
-                }
+                },
                 Err(e) => {
                     if !quiet {
-                         eprintln!("Warning: Failed to process model {:?}: {:?}", model, e);
+                        eprintln!("Warning: Failed to process model {:?}: {:?}", model, e);
                     }
                 }
             }
-             // Optional: Add a small delay between requests in CLI mode too
-             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
-         if !quiet {
-             println!("--- Finished checking all models ---");
-         }
-
     } else {
-        // --- Mode: Original logic for a single GPU model ---
         let url = format!("{}{}", scraper::BASE_URL, args.gpu);
-        // Use the async fetch_html from the web module
         let html = web::fetch_html(&url, quiet).await?;
         let mut listings = scraper::parse_listings(&html, quiet)?;
-
-        // --- Filtering ---
         if !args.all {
             let original_count = listings.len();
             listings.retain(|item| {
@@ -120,49 +101,43 @@ async fn run_cli(args: Args) -> Result<()> {
         } else if !quiet {
             println!("Showing all listings (--all flag detected).");
         }
-        final_listings = listings; // Assign to the final list
+        final_listings = listings;
     }
 
-    // --- Sorting (Applied to results from either mode) ---
     if !final_listings.is_empty() {
-         if !quiet {
-            println!("Sorting results by {:?} {}...", args.sort_by, if args.desc { "descending" } else { "ascending" });
-         }
+        if !quiet {
+            println!(
+                "Sorting results by {:?} {}...",
+                args.sort_by,
+                if args.desc { "descending" } else { "ascending" }
+            );
+        }
         final_listings.sort_by(|a, b| {
             let ordering = match args.sort_by {
                 SortColumn::Name => a.name.cmp(&b.name),
                 SortColumn::Status => a.status.cmp(&b.status),
-                SortColumn::Price => {
-                    match (a.price_numeric, b.price_numeric) {
-                        (Some(pa), Some(pb)) => pa.partial_cmp(&pb).unwrap_or(Ordering::Equal),
-                        (Some(_), None) => Ordering::Less,
-                        (None, Some(_)) => Ordering::Greater,
-                        (None, None) => a.price.cmp(&b.price),
-                    }
+                SortColumn::Price => match (a.price_numeric, b.price_numeric) {
+                    (Some(pa), Some(pb)) => pa.partial_cmp(&pb).unwrap_or(std::cmp::Ordering::Equal),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => a.price.cmp(&b.price),
                 },
                 SortColumn::LastAvailable => a.last_available.cmp(&b.last_available),
                 SortColumn::Link => a.link.cmp(&b.link),
             };
-
-            if args.desc {
-                ordering.reverse()
-            } else {
-                ordering
-            }
+            if args.desc { ordering.reverse() } else { ordering }
         });
     }
 
-    // --- Limiting (Applied to results from either mode) ---
     if let Some(limit) = args.limit {
         if limit < final_listings.len() {
-             if !quiet {
+            if !quiet {
                 println!("Limiting results to the top {} listings.", limit);
-             }
+            }
             final_listings.truncate(limit);
         }
     }
 
-    // --- Output ---
     match args.format {
         OutputFormat::Table => output::print_table(&final_listings, &args.sort_by, args.desc),
         OutputFormat::Json => output::print_json(&final_listings)?,

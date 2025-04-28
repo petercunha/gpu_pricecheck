@@ -123,6 +123,8 @@ pub async fn fetch_html(url: &str, quiet: bool) -> Result<String> {
         println!("Fetching URL: {}", url);
     }
     let client = reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .http1_only()
         .user_agent(scraper::USER_AGENT)
         .timeout(Duration::from_secs(15))
         .build()?;

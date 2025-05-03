@@ -14,6 +14,8 @@ pub enum GpuModel {
     Rtx5070Ti,
     #[value(name = "5070")]
     Rtx5070,
+    #[value(name = "9070xt")]
+    Rx9070Xt,
 }
 
 // Implement Display to get the URL part
@@ -24,6 +26,7 @@ impl fmt::Display for GpuModel {
             GpuModel::Rtx5080 => write!(f, "rtx5080/"),
             GpuModel::Rtx5070Ti => write!(f, "rtx5070ti/"),
             GpuModel::Rtx5070 => write!(f, "rtx5070/"),
+            GpuModel::Rx9070Xt => write!(f, "rx9070xt/"),
         }
     }
 }
@@ -40,6 +43,7 @@ impl FromStr for GpuModel {
             "5080" | "rtx5080" => Ok(GpuModel::Rtx5080),
             "5070ti" | "rtx5070ti" => Ok(GpuModel::Rtx5070Ti),
             "5070" | "rtx5070" => Ok(GpuModel::Rtx5070),
+            "9070xt" | "rx9070xt" => Ok(GpuModel::Rx9070Xt),
             _ => Err(ParseGpuModelError(s.to_string())),
         }
     }

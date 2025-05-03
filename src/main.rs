@@ -41,7 +41,7 @@ async fn run_cli(args: Args) -> Result<()> {
         let cheapest_futures = models.iter().map(|model| {
             let model = *model;
             async move {
-                let model_url = format!("{}{}", scraper::BASE_URL, model);
+                let model_url = format!("{}{}", scraper::get_base_url(model), model);
                 let res = (|| async {
                     let html = web::fetch_html(&model_url, !logging)
                         .await
@@ -84,7 +84,7 @@ async fn run_cli(args: Args) -> Result<()> {
             }
         }
     } else {
-        let url = format!("{}{}", scraper::BASE_URL, args.gpu);
+        let url = format!("{}{}", scraper::get_base_url(args.gpu), args.gpu);
         let html = web::fetch_html(&url, !logging).await?;
         let mut listings = scraper::parse_listings(&html, !logging)?;
         if !args.all {

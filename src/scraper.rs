@@ -3,8 +3,17 @@ use regex::Regex;
 use scraper::{Html, Selector, ElementRef}; // Import ElementRef
 use lazy_static::lazy_static;
 use serde::Serialize;
+use crate::cli::GpuModel; // Add this import to use GpuModel
 
-pub const BASE_URL: &str = "https://www.nowinstock.net/computers/videocards/nvidia/";
+/// Returns the base URL for fetching listings based on the GPU model.
+pub fn get_base_url(gpu: GpuModel) -> &'static str {
+    match gpu {
+        // AMD cards use the AMD URL, others use the Nvidia URL.
+        GpuModel::Rx9070Xt => "https://www.nowinstock.net/computers/videocards/amd/",
+        _ => "https://www.nowinstock.net/computers/videocards/nvidia/",
+    }
+}
+
 pub const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"; // Made public
 
 lazy_static! {

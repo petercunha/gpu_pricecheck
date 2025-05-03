@@ -53,7 +53,7 @@ where
 async fn home_handler(State(_state): State<Arc<AppState>>) -> impl IntoResponse {
     let models_to_check = GpuModel::value_variants();
     let fetch_futures = models_to_check.iter().map(|model| async move {
-        let model_url = format!("{}{}", scraper::BASE_URL, model);
+        let model_url = format!("{}{}", scraper::get_base_url(*model), model);
         // Errors fetching/parsing a single model result in an empty list for that model,
         // allowing the page to still load with data from other models.
         match fetch_and_parse(&model_url).await {
@@ -97,7 +97,7 @@ async fn gpu_model_handler(
     let model: GpuModel = model_str.parse()
         // Use map_err to convert the parsing error into AppError
         .map_err(|_| AppError(anyhow!("Invalid GPU model specified: {}", model_str)))?;
-    let model_url = format!("{}{}", scraper::BASE_URL, model);
+    let model_url = format!("{}{}", scraper::get_base_url(model), model);
     // Use `?` to propagate errors from fetch_and_parse, automatically converting them to AppError
     let listings = fetch_and_parse(&model_url).await?;
     let template = IndexTemplate {
